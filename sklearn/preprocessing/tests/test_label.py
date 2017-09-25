@@ -11,7 +11,9 @@ from sklearn.utils.multiclass import type_of_target
 
 from sklearn.utils.testing import assert_array_equal
 from sklearn.utils.testing import assert_equal
+from sklearn.utils.testing import assert_true
 from sklearn.utils.testing import assert_raises
+from sklearn.utils.testing import assert_raise_message
 from sklearn.utils.testing import ignore_warnings
 
 from sklearn.preprocessing.label import LabelBinarizer
@@ -34,16 +36,25 @@ def toarray(a):
 
 
 def test_label_binarizer():
-    lb = LabelBinarizer()
-
     # one-class case defaults to negative label
+    # For dense case:
     inp = ["pos", "pos", "pos", "pos"]
+    lb = LabelBinarizer(sparse_output=False)
     expected = np.array([[0, 0, 0, 0]]).T
     got = lb.fit_transform(inp)
     assert_array_equal(lb.classes_, ["pos"])
     assert_array_equal(expected, got)
     assert_array_equal(lb.inverse_transform(got), inp)
 
+    # For sparse case:
+    lb = LabelBinarizer(sparse_output=True)
+    got = lb.fit_transform(inp)
+    assert_true(issparse(got))
+    assert_array_equal(lb.classes_, ["pos"])
+    assert_array_equal(expected, got.toarray())
+    assert_array_equal(lb.inverse_transform(got.toarray()), inp)
+
+    lb = LabelBinarizer(sparse_output=False)
     # two-class case
     inp = ["neg", "pos", "pos", "neg"]
     expected = np.array([[0, 1, 1, 0]]).T
@@ -87,43 +98,6 @@ def test_label_binarizer_unseen_labels():
                          [0, 0, 0]])
     got = lb.transform(['a', 'b', 'c', 'd', 'e', 'f'])
     assert_array_equal(expected, got)
-
-
-@ignore_warnings
-def test_label_binarizer_column_y():
-    # first for binary classification vs multi-label with 1 possible class
-    # lists are multi-label, array is multi-class :-/
-    inp_list = [[1], [2], [1]]
-    inp_array = np.array(inp_list)
-
-    multilabel_indicator = np.array([[1, 0], [0, 1], [1, 0]])
-    binaryclass_array = np.array([[0], [1], [0]])
-
-    lb_1 = LabelBinarizer()
-    out_1 = lb_1.fit_transform(inp_list)
-
-    lb_2 = LabelBinarizer()
-    out_2 = lb_2.fit_transform(inp_array)
-
-    assert_array_equal(out_1, multilabel_indicator)
-    assert_array_equal(out_2, binaryclass_array)
-
-    # second for multiclass classification vs multi-label with multiple
-    # classes
-    inp_list = [[1], [2], [1], [3]]
-    inp_array = np.array(inp_list)
-
-    # the indicator matrix output is the same in this case
-    indicator = np.array([[1, 0, 0], [0, 1, 0], [1, 0, 0], [0, 0, 1]])
-
-    lb_1 = LabelBinarizer()
-    out_1 = lb_1.fit_transform(inp_list)
-
-    lb_2 = LabelBinarizer()
-    out_2 = lb_2.fit_transform(inp_array)
-
-    assert_array_equal(out_1, out_2)
-    assert_array_equal(out_2, indicator)
 
 
 def test_label_binarizer_set_label_encoding():
@@ -174,6 +148,10 @@ def test_label_binarizer_errors():
                   y=csr_matrix([[1, 2], [2, 1]]), output_type="foo",
                   classes=[1, 2], threshold=0)
 
+    # Sequence of seq type should raise ValueError
+    y_seq_of_seqs = [[], [1, 2], [3], [0, 1, 3], [2]]
+    assert_raises(ValueError, LabelBinarizer().fit_transform, y_seq_of_seqs)
+
     # Fail on the number of classes
     assert_raises(ValueError, _inverse_binarize_thresholding,
                   y=csr_matrix([[1, 2], [2, 1]]), output_type="foo",
@@ -201,6 +179,10 @@ def test_label_encoder():
                        [0, 1, 4, 4, 5, -1, -1])
     assert_raises(ValueError, le.transform, [0, 6])
 
+    le.fit(["apple", "orange"])
+    msg = "bad input shape"
+    assert_raise_message(ValueError, msg, le.transform, "apple")
+
 
 def test_label_encoder_fit_transform():
     # Test fit_transform
@@ -219,6 +201,13 @@ def test_label_encoder_errors():
     assert_raises(ValueError, le.transform, [])
     assert_raises(ValueError, le.inverse_transform, [])
 
+    # Fail on unseen labels
+    le = LabelEncoder()
+    le.fit([1, 2, 3, -1, 1])
+    msg = "contains previously unseen labels"
+    assert_raise_message(ValueError, msg, le.inverse_transform, [-2])
+    assert_raise_message(ValueError, msg, le.inverse_transform, [-2, -3, -4])
+
 
 def test_sparse_output_multilabel_binarizer():
     # test input as iterable of iterables
@@ -234,11 +223,13 @@ def test_sparse_output_multilabel_binarizer():
     inverse = inputs[0]()
     for sparse_output in [True, False]:
         for inp in inputs:
-            # With fit_tranform
+            # With fit_transform
             mlb = MultiLabelBinarizer(sparse_output=sparse_output)
             got = mlb.fit_transform(inp())
             assert_equal(issparse(got), sparse_output)
             if sparse_output:
+                # verify CSR assumption that indices and indptr have same dtype
+                assert_equal(got.indices.dtype, got.indptr.dtype)
                 got = got.toarray()
             assert_array_equal(indicator_mat, got)
             assert_array_equal([1, 2, 3], mlb.classes_)
@@ -249,6 +240,8 @@ def test_sparse_output_multilabel_binarizer():
             got = mlb.fit(inp()).transform(inp())
             assert_equal(issparse(got), sparse_output)
             if sparse_output:
+                # verify CSR assumption that indices and indptr have same dtype
+                assert_equal(got.indices.dtype, got.indptr.dtype)
                 got = got.toarray()
             assert_array_equal(indicator_mat, got)
             assert_array_equal([1, 2, 3], mlb.classes_)
@@ -272,7 +265,7 @@ def test_multilabel_binarizer():
                               [1, 1, 0]])
     inverse = inputs[0]()
     for inp in inputs:
-        # With fit_tranform
+        # With fit_transform
         mlb = MultiLabelBinarizer()
         got = mlb.fit_transform(inp())
         assert_array_equal(indicator_mat, got)
@@ -408,6 +401,13 @@ def test_label_binarize_with_class_order():
     # Modified class order
     out = label_binarize([1, 6], classes=[1, 6, 4, 2])
     expected = np.array([[1, 0, 0, 0], [0, 1, 0, 0]])
+    assert_array_equal(out, expected)
+
+    out = label_binarize([0, 1, 2, 3], classes=[3, 2, 0, 1])
+    expected = np.array([[0, 0, 1, 0],
+                         [0, 0, 0, 1],
+                         [0, 1, 0, 0],
+                         [1, 0, 0, 0]])
     assert_array_equal(out, expected)
 
 

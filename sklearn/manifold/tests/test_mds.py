@@ -1,10 +1,10 @@
 import numpy as np
 from numpy.testing import assert_array_almost_equal
 
-from nose.tools import assert_raises
 from sklearn.manifold import mds
 from sklearn.metrics import euclidean_distances
 from sklearn.utils.testing import assert_less
+from sklearn.utils.testing import assert_raises
 
 
 def test_smacof():

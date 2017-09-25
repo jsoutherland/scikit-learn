@@ -1,4 +1,4 @@
-# Author: Lars Buitinck <L.J.Buitinck@uva.nl>
+# Author: Lars Buitinck
 # License: 3-clause BSD
 
 import numpy as np
@@ -14,6 +14,8 @@ class VarianceThreshold(BaseEstimator, SelectorMixin):
 
     This feature selection algorithm looks only at the features (X), not the
     desired outputs (y), and can thus be used for unsupervised learning.
+
+    Read more in the :ref:`User Guide <variance_threshold>`.
 
     Parameters
     ----------
@@ -52,7 +54,7 @@ class VarianceThreshold(BaseEstimator, SelectorMixin):
             Sample vectors from which to compute variances.
 
         y : any
-            Ignored. This parameter exists only for compatibility with
+            Ignored This parameter exists only for compatibility with
             sklearn.pipeline.Pipeline.
 
         Returns

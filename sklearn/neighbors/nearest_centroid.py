@@ -13,12 +13,11 @@ import numpy as np
 from scipy import sparse as sp
 
 from ..base import BaseEstimator, ClassifierMixin
-from ..externals.six.moves import xrange
 from ..metrics.pairwise import pairwise_distances
 from ..preprocessing import LabelEncoder
 from ..utils.validation import check_array, check_X_y, check_is_fitted
 from ..utils.sparsefuncs import csc_median_axis_0
-
+from ..utils.multiclass import check_classification_targets
 
 class NearestCentroid(BaseEstimator, ClassifierMixin):
     """Nearest centroid classifier.
@@ -26,9 +25,11 @@ class NearestCentroid(BaseEstimator, ClassifierMixin):
     Each class is represented by its centroid, with test samples classified to
     the class with the nearest centroid.
 
+    Read more in the :ref:`User Guide <nearest_centroid_classifier>`.
+
     Parameters
     ----------
-    metric: string, or callable
+    metric : string, or callable
         The metric to use when calculating distance between instances in a
         feature array. If metric is a string or callable, it must be one of
         the options allowed by metrics.pairwise.pairwise_distances for its
@@ -94,6 +95,8 @@ class NearestCentroid(BaseEstimator, ClassifierMixin):
         y : array, shape = [n_samples]
             Target values (integers)
         """
+        if self.metric == 'precomputed':
+            raise ValueError("Precomputed is not supported.")
         # If X is sparse and the metric is "manhattan", store it in a csc
         # format is easier to calculate the median.
         if self.metric == 'manhattan':
@@ -104,6 +107,7 @@ class NearestCentroid(BaseEstimator, ClassifierMixin):
         if is_X_sparse and self.shrink_threshold:
             raise ValueError("threshold shrinking not supported"
                              " for sparse input")
+        check_classification_targets(y)
 
         n_samples, n_features = X.shape
         le = LabelEncoder()
@@ -113,7 +117,7 @@ class NearestCentroid(BaseEstimator, ClassifierMixin):
         if n_classes < 2:
             raise ValueError('y has less than 2 classes')
 
-        # Mask mapping each class to it's members.
+        # Mask mapping each class to its members.
         self.centroids_ = np.empty((n_classes, n_features), dtype=np.float64)
         # Number of clusters in each class.
         nk = np.zeros(n_classes)
@@ -143,7 +147,7 @@ class NearestCentroid(BaseEstimator, ClassifierMixin):
             dataset_centroid_ = np.mean(X, axis=0)
 
             # m parameter for determining deviation
-            m = np.sqrt((1. / nk) + (1. / n_samples))
+            m = np.sqrt((1. / nk) - (1. / n_samples))
             # Calculate deviation using the standard deviation of centroids.
             variance = (X - self.centroids_[y_ind]) ** 2
             variance = variance.sum(axis=0)

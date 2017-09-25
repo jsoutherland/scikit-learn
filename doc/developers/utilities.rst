@@ -43,8 +43,10 @@ should be used when applicable.
   be sliced or indexed using safe_index.  This is used to validate input for
   cross-validation.
 
-- :func:`warn_if_not_float`: Warn if input is not a floating-point value.
-  the input ``X`` is assumed to have ``X.dtype``.
+- :func:`validation.check_memory` checks that input is ``joblib.Memory``-like,
+  which means that it can be converted into a
+  ``sklearn.externals.joblib.Memory`` instance (typically a str denoting
+  the ``cachedir``) or has the same interface.
 
 If your code relies on a random number generator, it should never use
 functions like ``numpy.random.random`` or ``numpy.random.normal``.  This
@@ -71,6 +73,15 @@ For example::
     >>> random_state.rand(4)
     array([ 0.5488135 ,  0.71518937,  0.60276338,  0.54488318])
 
+When developing your own scikit-learn compatible estimator, the following
+helpers are available.
+
+- :func:`validation.check_is_fitted`: check that the estimator has been fitted
+  before calling ``transform``, ``predict``, or similar methods. This helper
+  allows to raise a standardized error message across estimator.
+
+- :func:`validation.has_fit_parameter`: check that a given parameter is
+  supported in the ``fit`` method of a given estimator.
 
 Efficient Linear Algebra & Array Operations
 ===========================================
@@ -92,11 +103,6 @@ Efficient Linear Algebra & Array Operations
 - :func:`arrayfuncs.min_pos`: (used in ``sklearn.linear_model.least_angle``)
   Find the minimum of the positive values within an array.
 
-- :func:`extmath.norm`: computes Euclidean (L2) vector norm
-  by directly calling the BLAS
-  ``nrm2`` function.  This is more stable than ``scipy.linalg.norm``.  See
-  `Fabian's blog post
-  <http://fseoane.net/blog/2011/computing-the-vector-norm/>`_ for a discussion.
 
 - :func:`extmath.fast_logdet`: efficiently compute the log of the determinant
   of a matrix.
@@ -106,15 +112,6 @@ Efficient Linear Algebra & Array Operations
 - :func:`extmath.safe_sparse_dot`: dot product which will correctly handle
   ``scipy.sparse`` inputs.  If the inputs are dense, it is equivalent to
   ``numpy.dot``.
-
-- :func:`extmath.logsumexp`: compute the sum of X assuming X is in the log
-  domain. This is equivalent to calling ``np.log(np.sum(np.exp(X)))``, but is
-  robust to overflow/underflow errors.  Note that there is similar
-  functionality in ``np.logaddexp.reduce``, but because of the pairwise nature
-  of this routine, it is slower for large arrays.
-  Scipy has a similar routine in ``scipy.misc.logsumexp`` (In scipy versions
-  < 0.10, this is found in ``scipy.maxentropy.logsumexp``),
-  but the scipy version does not accept an ``axis`` keyword.
 
 - :func:`extmath.weighted_mode`: an extension of ``scipy.stats.mode`` which
   allows each item to have a real-valued weight.
@@ -147,7 +144,7 @@ efficiently process ``scipy.sparse`` data.
 
 - :func:`sparsefuncs.inplace_csr_row_normalize_l1` and
   :func:`sparsefuncs.inplace_csr_row_normalize_l2`: can be used to normalize
-  individual sparse samples to unit l1 or l2 norm as done in
+  individual sparse samples to unit L1 or L2 norm as done in
   :class:`sklearn.preprocessing.Normalizer`.
 
 - :func:`sparsefuncs.inplace_csr_column_scale`: can be used to multiply the
@@ -162,60 +159,17 @@ Graph Routines
 - :func:`graph.single_source_shortest_path_length`:
   (not currently used in scikit-learn)
   Return the shortest path from a single source
-  to all connected nodes on a graph.  Code is adapted from networkx.
+  to all connected nodes on a graph.  Code is adapted from `networkx
+  <https://networkx.github.io/>`_.
   If this is ever needed again, it would be far faster to use a single
   iteration of Dijkstra's algorithm from ``graph_shortest_path``.
 
-- :func:`graph.graph_laplacian`:
-  (used in :func:`sklearn.cluster.spectral.spectral_embedding`)
-  Return the Laplacian of a given graph.  There is specialized code for
-  both dense and sparse connectivity matrices.
-
 - :func:`graph_shortest_path.graph_shortest_path`:
-  (used in :class:``sklearn.manifold.Isomap``)
+  (used in :class:`sklearn.manifold.Isomap`)
   Return the shortest path between all pairs of connected points on a directed
   or undirected graph.  Both the Floyd-Warshall algorithm and Dijkstra's
   algorithm are available.  The algorithm is most efficient when the
   connectivity matrix is a ``scipy.sparse.csr_matrix``.
-
-
-Backports
-=========
-
-- :func:`fixes.expit`: Logistic sigmoid function. Replacement for SciPy 0.10's
-  ``scipy.special.expit``.
-
-- :func:`sparsetools.connected_components`
-  (backported from ``scipy.sparse.connected_components`` in scipy 0.12).
-  Used in ``sklearn.cluster.hierarchical``, as well as in tests for
-  :mod:`sklearn.feature_extraction`.
-
-- :func:`fixes.isclose`
-  (backported from ``numpy.isclose`` in numpy 1.8.1).
-  In versions before 1.7, this function was not available in
-  numpy. Used in ``sklearn.metrics``.
-
-
-ARPACK
-------
-
-- :func:`arpack.eigs`
-  (backported from ``scipy.sparse.linalg.eigs`` in scipy 0.10)
-  Sparse non-symmetric eigenvalue decomposition using the Arnoldi
-  method.  A limited version of ``eigs`` is available in earlier
-  scipy versions.
-
-- :func:`arpack.eigsh`
-  (backported from ``scipy.sparse.linalg.eigsh`` in scipy 0.10)
-  Sparse non-symmetric eigenvalue decomposition using the Arnoldi
-  method.  A limited version of ``eigsh`` is available in earlier
-  scipy versions.
-
-- :func:`arpack.svds`
-  (backported from ``scipy.sparse.linalg.svds`` in scipy 0.10)
-  Sparse non-symmetric eigenvalue decomposition using the Arnoldi
-  method.  A limited version of ``svds`` is available in earlier
-  scipy versions.
 
 
 Benchmarking
@@ -238,7 +192,7 @@ Testing Functions
   requests to mldata.org. Used in tests of :mod:`sklearn.datasets`.
 
 - :func:`testing.all_estimators` : returns a list of all estimators in
-  sklearn to test for consistent behavior and interfaces.
+  scikit-learn to test for consistent behavior and interfaces.
 
 Multiclass and multilabel utility function
 ==========================================
@@ -295,5 +249,5 @@ Warnings and Exceptions
 
 - :class:`deprecated`: Decorator to mark a function or class as deprecated.
 
-- :class:`ConvergenceWarning`: Custom warning to catch convergence problems.
-  Used in ``sklearn.covariance.graph_lasso``.
+- :class:`sklearn.exceptions.ConvergenceWarning`: Custom warning to catch
+  convergence problems. Used in ``sklearn.covariance.graph_lasso``.

@@ -7,14 +7,13 @@ import warnings
 import numpy as np
 from scipy import stats
 
-from nose.tools import assert_raises
-
 from sklearn.utils.testing import assert_almost_equal
 from sklearn.utils.testing import assert_array_almost_equal
 from sklearn.utils.testing import assert_true
 from sklearn.utils.testing import assert_less
 from sklearn.utils.testing import assert_equal
 from sklearn.utils.testing import assert_warns
+from sklearn.utils.testing import assert_raises
 
 from sklearn.decomposition import FastICA, fastica, PCA
 from sklearn.decomposition.fastica_ import _gs_decorrelation
@@ -234,8 +233,3 @@ def test_inverse_transform():
             # reversibility test in non-reduction case
             if n_components == X.shape[1]:
                 assert_array_almost_equal(X, X2)
-
-
-if __name__ == '__main__':
-    import nose
-    nose.run(argv=['', __file__])

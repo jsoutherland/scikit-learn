@@ -3,7 +3,7 @@
 # Authors: Jake Vanderplas <vanderplas@astro.washington.edu>
 #          Fabian Pedregosa <fabian.pedregosa@inria.fr>
 #          Alexandre Gramfort <alexandre.gramfort@inria.fr>
-#          Sparseness support by Lars Buitinck <L.J.Buitinck@uva.nl>
+#          Sparseness support by Lars Buitinck
 #          Multi-output support by Arnaud Joly <a.joly@ulg.ac.be>
 #
 # License: BSD 3 clause (C) INRIA, University of Amsterdam
@@ -24,10 +24,12 @@ class KNeighborsRegressor(NeighborsBase, KNeighborsMixin,
     The target is predicted by local interpolation of the targets
     associated of the nearest neighbors in the training set.
 
+    Read more in the :ref:`User Guide <regression>`.
+
     Parameters
     ----------
     n_neighbors : int, optional (default = 5)
-        Number of neighbors to use by default for :meth:`k_neighbors` queries.
+        Number of neighbors to use by default for :meth:`kneighbors` queries.
 
     weights : str or callable
         weight function used in prediction.  Possible values:
@@ -47,7 +49,7 @@ class KNeighborsRegressor(NeighborsBase, KNeighborsMixin,
         Algorithm used to compute the nearest neighbors:
 
         - 'ball_tree' will use :class:`BallTree`
-        - 'kd_tree' will use :class:`KDtree`
+        - 'kd_tree' will use :class:`KDTree`
         - 'brute' will use a brute-force search.
         - 'auto' will attempt to decide the most appropriate algorithm
           based on the values passed to :meth:`fit` method.
@@ -61,19 +63,24 @@ class KNeighborsRegressor(NeighborsBase, KNeighborsMixin,
         required to store the tree.  The optimal value depends on the
         nature of the problem.
 
-    metric : string or DistanceMetric object (default='minkowski')
-        the distance metric to use for the tree.  The default metric is
-        minkowski, and with p=2 is equivalent to the standard Euclidean
-        metric. See the documentation of the DistanceMetric class for a
-        list of available metrics.
-
     p : integer, optional (default = 2)
         Power parameter for the Minkowski metric. When p = 1, this is
         equivalent to using manhattan_distance (l1), and euclidean_distance
         (l2) for p = 2. For arbitrary p, minkowski_distance (l_p) is used.
 
-    metric_params: dict, optional (default = None)
-        additional keyword arguments for the metric function.
+    metric : string or callable, default 'minkowski'
+        the distance metric to use for the tree.  The default metric is
+        minkowski, and with p=2 is equivalent to the standard Euclidean
+        metric. See the documentation of the DistanceMetric class for a
+        list of available metrics.
+
+    metric_params : dict, optional (default = None)
+        Additional keyword arguments for the metric function.
+
+    n_jobs : int, optional (default = 1)
+        The number of parallel jobs to run for neighbors search.
+        If ``-1``, then the number of jobs is set to the number of CPU cores.
+        Doesn't affect :meth:`fit` method.
 
     Examples
     --------
@@ -105,16 +112,17 @@ class KNeighborsRegressor(NeighborsBase, KNeighborsMixin,
        but different labels, the results will depend on the ordering of the
        training data.
 
-    http://en.wikipedia.org/wiki/K-nearest_neighbor_algorithm
+    https://en.wikipedia.org/wiki/K-nearest_neighbor_algorithm
     """
 
     def __init__(self, n_neighbors=5, weights='uniform',
                  algorithm='auto', leaf_size=30,
-                 p=2, metric='minkowski', metric_params=None, **kwargs):
+                 p=2, metric='minkowski', metric_params=None, n_jobs=1,
+                 **kwargs):
         self._init_params(n_neighbors=n_neighbors,
                           algorithm=algorithm,
                           leaf_size=leaf_size, metric=metric, p=p,
-                          metric_params=metric_params, **kwargs)
+                          metric_params=metric_params, n_jobs=n_jobs, **kwargs)
         self.weights = _check_weights(weights)
 
     def predict(self, X):
@@ -122,8 +130,9 @@ class KNeighborsRegressor(NeighborsBase, KNeighborsMixin,
 
         Parameters
         ----------
-        X : array or matrix, shape = [n_samples, n_features]
-
+        X : array-like, shape (n_query, n_features), \
+                or (n_query, n_indexed) if metric == 'precomputed'
+            Test samples.
 
         Returns
         -------
@@ -143,7 +152,7 @@ class KNeighborsRegressor(NeighborsBase, KNeighborsMixin,
         if weights is None:
             y_pred = np.mean(_y[neigh_ind], axis=1)
         else:
-            y_pred = np.empty((X.shape[0], _y.shape[1]), dtype=np.float)
+            y_pred = np.empty((X.shape[0], _y.shape[1]), dtype=np.float64)
             denom = np.sum(weights, axis=1)
 
             for j in range(_y.shape[1]):
@@ -164,10 +173,12 @@ class RadiusNeighborsRegressor(NeighborsBase, RadiusNeighborsMixin,
     The target is predicted by local interpolation of the targets
     associated of the nearest neighbors in the training set.
 
+    Read more in the :ref:`User Guide <regression>`.
+
     Parameters
     ----------
     radius : float, optional (default = 1.0)
-        Range of parameter space to use by default for :meth`radius_neighbors`
+        Range of parameter space to use by default for :meth:`radius_neighbors`
         queries.
 
     weights : str or callable
@@ -188,7 +199,7 @@ class RadiusNeighborsRegressor(NeighborsBase, RadiusNeighborsMixin,
         Algorithm used to compute the nearest neighbors:
 
         - 'ball_tree' will use :class:`BallTree`
-        - 'kd_tree' will use :class:`KDtree`
+        - 'kd_tree' will use :class:`KDTree`
         - 'brute' will use a brute-force search.
         - 'auto' will attempt to decide the most appropriate algorithm
           based on the values passed to :meth:`fit` method.
@@ -202,19 +213,19 @@ class RadiusNeighborsRegressor(NeighborsBase, RadiusNeighborsMixin,
         required to store the tree.  The optimal value depends on the
         nature of the problem.
 
-    metric : string or DistanceMetric object (default='minkowski')
-        the distance metric to use for the tree.  The default metric is
-        minkowski, and with p=2 is equivalent to the standard Euclidean
-        metric. See the documentation of the DistanceMetric class for a
-        list of available metrics.
-
     p : integer, optional (default = 2)
         Power parameter for the Minkowski metric. When p = 1, this is
         equivalent to using manhattan_distance (l1), and euclidean_distance
         (l2) for p = 2. For arbitrary p, minkowski_distance (l_p) is used.
 
-    metric_params: dict, optional (default = None)
-        additional keyword arguments for the metric function.
+    metric : string or callable, default 'minkowski'
+        the distance metric to use for the tree.  The default metric is
+        minkowski, and with p=2 is equivalent to the standard Euclidean
+        metric. See the documentation of the DistanceMetric class for a
+        list of available metrics.
+
+    metric_params : dict, optional (default = None)
+        Additional keyword arguments for the metric function.
 
     Examples
     --------
@@ -239,7 +250,7 @@ class RadiusNeighborsRegressor(NeighborsBase, RadiusNeighborsMixin,
     See :ref:`Nearest Neighbors <neighbors>` in the online documentation
     for a discussion of the choice of ``algorithm`` and ``leaf_size``.
 
-    http://en.wikipedia.org/wiki/K-nearest_neighbor_algorithm
+    https://en.wikipedia.org/wiki/K-nearest_neighbor_algorithm
     """
 
     def __init__(self, radius=1.0, weights='uniform',
@@ -257,7 +268,9 @@ class RadiusNeighborsRegressor(NeighborsBase, RadiusNeighborsMixin,
 
         Parameters
         ----------
-        X : array or matrix, shape = [n_samples, n_features]
+        X : array-like, shape (n_query, n_features), \
+                or (n_query, n_indexed) if metric == 'precomputed'
+            Test samples.
 
         Returns
         -------
