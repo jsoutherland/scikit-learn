@@ -109,9 +109,7 @@ def _smacof_single(dissimilarities, metric=True, n_components=2, init=None,
                                    (disparities ** 2).sum())
 
         # Compute stress
-        stress = (euclidean_distances(
-            dis.ravel(), disparities.ravel()) ** 2).sum()
-        stress /= 2
+        stress = ((dis.ravel() - disparities.ravel()) ** 2).sum() / 2
 
         # Update X using the Guttman transform
         dis[dis == 0] = 1e-5
